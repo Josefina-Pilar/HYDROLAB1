@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="HYDROLAB – Laboratorio Virtual de Hidrostática en 3D: presión, teorema general, prensa hidráulica y principio de Arquímedes.">
+  <meta name="theme-color" content="#070b1a">
+  <title>HYDROLAB – Laboratorio Virtual de Hidrostática</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="assets/fonts/Poppins-Regular.woff" as="font" type="font/woff" crossorigin>
+  <link rel="preload" href="assets/fonts/Poppins-Bold.woff" as="font" type="font/woff" crossorigin>
+  <link rel="stylesheet" href="styles.css?v=3.1.0">
+</head>
+<body class="is-intro">
+<noscript><div style="position:fixed;inset:0;z-index:200;display:grid;place-content:center;background:#070b1a;color:#e9eeff;font-family:sans-serif;text-align:center;padding:24px">HYDROLAB necesita JavaScript activado para funcionar.</div></noscript>
+
+<!-- ================= LIENZO 3D Y ETIQUETAS ================= -->
+<canvas id="gl" aria-label="Laboratorio 3D interactivo"></canvas>
+<div id="labels" aria-hidden="true"></div>
+
+<!-- Pantalla de carga -->
+<div id="loading" class="loading">
+  <div class="ld-logo">HYDRO<b>LAB</b></div>
+  <div class="ld-bar"><span id="ld-fill"></span></div>
+  <p id="ld-text">Encendiendo el laboratorio…</p>
+</div>
+
+<!-- Aviso si el navegador no soporta 3D -->
+<div id="nogl" class="nogl" hidden>
+  <h2>Tu navegador no puede mostrar gráficos 3D</h2>
+  <p>HYDROLAB necesita WebGL 2. Probá con una versión actual de Chrome, Edge, Firefox o Safari y verificá que la aceleración por hardware esté activada.</p>
+</div>
+
+<!-- ================= BARRA SUPERIOR ================= -->
+<header class="topbar">
+  <a class="brand" href="#lobby" data-go="lobby" aria-label="HYDROLAB, volver al laboratorio">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-txt">HYDRO<b>LAB</b><small>Laboratorio Virtual de Hidrostática</small></span>
+  </a>
+  <nav class="modnav" id="modnav" aria-label="Módulos">
+    <a href="#lobby" data-go="lobby"><i>⌂</i><span>Laboratorio</span></a>
+    <a href="#presion" data-go="presion"><i>1</i><span>Presión</span></a>
+    <a href="#teorema" data-go="teorema"><i>2</i><span>Teorema</span></a>
+    <a href="#prensa" data-go="prensa"><i>3</i><span>Prensa</span></a>
+    <a href="#arquimedes" data-go="arquimedes"><i>4</i><span>Arquímedes</span></a>
+    <a href="#desafio" data-go="desafio"><i>★</i><span>Desafío</span></a>
+  </nav>
+  <div class="top-tools">
+    <div class="progress" title="Módulos explorados"><span class="pg-bar"><span id="pg-fill"></span></span><span id="pg-txt">0/5</span></div>
+    <button type="button" class="icon-btn" id="btn-theory" title="Teoría del módulo" aria-label="Abrir teoría">📖<span>Teoría</span></button>
+    <button type="button" class="icon-btn" id="btn-view" title="Volver a la vista inicial" aria-label="Restablecer cámara">⟲<span>Vista</span></button>
+    <button type="button" class="icon-btn" id="btn-help" title="Cómo mover la cámara" aria-label="Ayuda de cámara">?<span>Ayuda</span></button>
+  </div>
+</header>
+
+<!-- ================= PANTALLA DE INICIO ================= -->
+<section id="intro" class="intro">
+  <div class="intro-card">
+    <span class="kicker">Laboratorio de investigación hidráulica</span>
+    <h1>HYDRO<b>LAB</b></h1>
+    <p class="intro-sub">Laboratorio Virtual de Hidrostática</p>
+    <p class="intro-txt">Entrá a un laboratorio 3D donde vas a bajar con un buzo hasta 20 metros de profundidad, medir presiones con sensores, levantar un auto con una prensa hidráulica y cargar un barco hasta ver cuándo deja de flotar. Cada número que veas sale de las fórmulas reales.</p>
+    <button type="button" class="btn btn-primary btn-xl" id="btn-start">INICIAR EXPERIENCIA <span>→</span></button>
+    <ul class="intro-feats">
+      <li><b>4</b> escenarios 3D</li>
+      <li><b>5</b> personajes guía</li>
+      <li><b>100 %</b> sin conexión</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ================= MENÚ DE MÓDULOS (VESTÍBULO) ================= -->
+<section id="lobby-menu" class="lobby-menu" hidden>
+  <h2>Elegí una estación del laboratorio</h2>
+  <div class="mod-cards">
+    <button type="button" class="mod-card c1" data-go="presion"><span class="mc-n">01</span><b>Presión estática</b><small>Bajá con el buzo hasta 20 m</small></button>
+    <button type="button" class="mod-card c2" data-go="teorema"><span class="mc-n">02</span><b>Teorema general</b><small>Compará dos sensores</small></button>
+    <button type="button" class="mod-card c3" data-go="prensa"><span class="mc-n">03</span><b>Prensa hidráulica</b><small>Levantá un auto en el taller</small></button>
+    <button type="button" class="mod-card c4" data-go="arquimedes"><span class="mc-n">04</span><b>Arquímedes</b><small>Cargá un barco en el puerto</small></button>
+    <button type="button" class="mod-card c5" data-go="desafio"><span class="mc-n">★</span><b>Desafío final</b><small>Misiones de ingeniería</small></button>
+  </div>
+</section>
+
+<!-- ================= PANEL IZQUIERDO: CONTROLES ================= -->
+<aside class="hud hud-left" id="hud-left" aria-label="Controles del experimento">
+  <div class="hud-tabs">
+    <button type="button" class="ht on" data-sheet="left">Controles</button>
+    <button type="button" class="ht" data-sheet="right">Datos</button>
+  </div>
+
+  <!-- ---------- PRESIÓN ---------- -->
+  <div class="mod-ui" data-mod="presion">
+    <h3 class="hud-title"><span>01</span> Presión estática</h3>
+    <div class="ctl">
+      <label for="pr-h-num">Profundidad del buzo <i>h</i></label>
+      <div class="row"><input type="range" id="pr-h-range" min="0" max="20" step="0.1" value="5"><span class="num"><input type="number" id="pr-h-num" min="0" max="20" step="any" value="5"><em>m</em></span></div>
+      <p class="tip">También podés <b>arrastrar al buzo</b> hacia arriba o hacia abajo.</p>
+    </div>
+    <div class="transport">
+      <button type="button" class="tb play" id="pr-play">▶ Descenso automático</button>
+      <button type="button" class="tb" id="pr-pause">⏸ Pausar</button>
+      <button type="button" class="tb" id="pr-reset">↺ Reiniciar</button>
+    </div>
+    <div class="ctl">
+      <label>Líquido del tanque <i>ρ</i></label>
+      <div class="chips" data-target="pr-rho">
+        <button type="button" data-v="1000">Agua dulce</button>
+        <button type="button" data-v="1025">Agua de mar</button>
+        <button type="button" data-v="920">Aceite</button>
+        <button type="button" data-v="1260">Glicerina</button>
+        <button type="button" data-v="720">Nafta</button>
+      </div>
+      <div class="row"><input type="range" id="pr-rho-range" min="700" max="1300" step="1" value="1000"><span class="num"><input type="number" id="pr-rho-num" min="700" max="1300" step="any" value="1000"><em>kg/m³</em></span></div>
+    </div>
+    <div class="ctl">
+      <label>Gravedad <i>g</i></label>
+      <div class="chips" data-target="pr-g">
+        <button type="button" data-v="9.81">Tierra</button>
+        <button type="button" data-v="1.62">Luna</button>
+        <button type="button" data-v="3.71">Marte</button>
+        <button type="button" data-v="24.79">Júpiter</button>
+      </div>
+      <div class="row"><input type="range" id="pr-g-range" min="1" max="25" step="0.01" value="9.81"><span class="num"><input type="number" id="pr-g-num" min="1" max="25" step="any" value="9.81"><em>m/s²</em></span></div>
+    </div>
+    <label class="sw"><input type="checkbox" id="pr-compare"><span></span>Comparar con un tanque de aceite</label>
+    <label class="sw"><input type="checkbox" id="pr-follow" checked><span></span>La cámara sigue al buzo</label>
+    <label class="sw"><input type="checkbox" id="pr-arrows" checked><span></span>Mostrar flechas de presión</label>
+  </div>
+
+  <!-- ---------- TEOREMA ---------- -->
+  <div class="mod-ui" data-mod="teorema">
+    <h3 class="hud-title"><span>02</span> Teorema general</h3>
+    <div class="ctl">
+      <label>Líquido del tanque <i>ρ</i></label>
+      <div class="chips" data-target="te-rho">
+        <button type="button" data-v="1000">Agua</button>
+        <button type="button" data-v="920">Aceite</button>
+        <button type="button" data-v="1025">Agua de mar</button>
+        <button type="button" data-v="13534">Mercurio</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label for="te-h1-num"><span class="dot d1"></span>Altura del sensor 1 <i>h₁</i></label>
+      <div class="row"><input type="range" id="te-h1-range" min="0" max="10" step="0.1" value="8"><span class="num"><input type="number" id="te-h1-num" min="0" max="10" step="any" value="8"><em>m</em></span></div>
+    </div>
+    <div class="ctl">
+      <label for="te-h2-num"><span class="dot d2"></span>Altura del sensor 2 <i>h₂</i></label>
+      <div class="row"><input type="range" id="te-h2-range" min="0" max="10" step="0.1" value="3"><span class="num"><input type="number" id="te-h2-num" min="0" max="10" step="any" value="3"><em>m</em></span></div>
+      <p class="tip"><b>Arrastrá los sensores</b> dentro del tanque: se mueven en altura y de costado.</p>
+    </div>
+    <div class="transport">
+      <button type="button" class="tb play" id="te-compare">⚖ COMPARAR PUNTOS</button>
+      <button type="button" class="tb" id="te-guide">▶ Comprobar el teorema</button>
+      <button type="button" class="tb" id="te-reset">↺ Reiniciar</button>
+    </div>
+    <details class="fine">
+      <summary>Ajustes avanzados</summary>
+      <div class="ctl">
+        <label for="te-rho-num">Densidad exacta <i>ρ</i></label>
+        <div class="row"><input type="range" id="te-rho-range" min="500" max="14000" step="10" value="1000"><span class="num"><input type="number" id="te-rho-num" min="500" max="14000" step="any" value="1000"><em>kg/m³</em></span></div>
+      </div>
+      <label class="sw"><input type="checkbox" id="te-auto" checked><span></span>Superficie libre a presión atmosférica (P₁ automática)</label>
+      <div class="ctl" id="te-p1-wrap">
+        <label for="te-p1-num">Presión en el sensor 1 <i>P₁</i></label>
+        <div class="row"><input type="range" id="te-p1-range" min="0" max="2000000" step="100" value="120945"><span class="num"><input type="number" id="te-p1-num" min="0" max="2000000" step="any" value="120945"><em>Pa</em></span></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- ---------- PRENSA ---------- -->
+  <div class="mod-ui" data-mod="prensa">
+    <h3 class="hud-title"><span>03</span> Prensa hidráulica</h3>
+    <div class="ctl">
+      <label for="ph-F1-num">Fuerza sobre el pistón chico <i>F₁</i></label>
+      <div class="row"><input type="range" id="ph-F1-range" min="10" max="1000" step="1" value="150"><span class="num"><input type="number" id="ph-F1-num" min="10" max="1000" step="any" value="150"><em>N</em></span></div>
+    </div>
+    <div class="ctl">
+      <label for="ph-A1-num">Área del pistón chico <i>A₁</i></label>
+      <div class="row"><input type="range" id="ph-A1-range" min="1" max="100" step="0.5" value="5"><span class="num"><input type="number" id="ph-A1-num" min="1" max="100" step="any" value="5"><em>cm²</em></span></div>
+    </div>
+    <div class="ctl">
+      <label for="ph-A2-num">Área del pistón grande <i>A₂</i></label>
+      <div class="row"><input type="range" id="ph-A2-range" min="10" max="1000" step="1" value="500"><span class="num"><input type="number" id="ph-A2-num" min="10" max="1000" step="any" value="500"><em>cm²</em></span></div>
+    </div>
+    <div class="ctl">
+      <label>Carga sobre la plataforma</label>
+      <div class="chips" data-target="ph-load">
+        <button type="button" data-v="1200">Auto · 1200 kg</button>
+        <button type="button" data-v="2000">Camioneta · 2000 kg</button>
+        <button type="button" data-v="80">Caja · 80 kg</button>
+      </div>
+      <div class="row hidden-row"><input type="range" id="ph-load-range" min="80" max="2000" step="1" value="1200"><span class="num"><input type="number" id="ph-load-num" min="80" max="2000" step="any" value="1200"><em>kg</em></span></div>
+    </div>
+    <div class="transport">
+      <button type="button" class="tb play" id="ph-up">▲ ACCIONAR PRENSA</button>
+      <button type="button" class="tb" id="ph-pause">⏸ Pausar</button>
+      <button type="button" class="tb" id="ph-down">▼ Bajar</button>
+      <button type="button" class="tb" id="ph-reset">↺ Reiniciar</button>
+    </div>
+    <button type="button" class="btn btn-ghost wide" id="ph-example">Cargar experimento de ejemplo</button>
+    <details class="fine">
+      <summary>Ajustes avanzados</summary>
+      <div class="ctl">
+        <label for="ph-d1-num">Recorrido por bombeo del pistón chico <i>d₁</i></label>
+        <div class="row"><input type="range" id="ph-d1-range" min="5" max="30" step="0.5" value="20"><span class="num"><input type="number" id="ph-d1-num" min="5" max="30" step="any" value="20"><em>cm</em></span></div>
+      </div>
+    </details>
+    <p class="tip">También podés <b>arrastrar la palanca</b> de la bomba hacia abajo.</p>
+  </div>
+
+  <!-- ---------- ARQUÍMEDES ---------- -->
+  <div class="mod-ui" data-mod="arquimedes">
+    <h3 class="hud-title"><span>04</span> Principio de Arquímedes</h3>
+    <div class="seg" role="tablist">
+      <button type="button" class="on" data-arview="port">🚢 Barco en el puerto</button>
+      <button type="button" data-arview="tank">🧪 Tanque de pruebas</button>
+    </div>
+    <div class="ar-port">
+      <div class="ctl">
+        <label for="ar-cargo-num">Carga transportada</label>
+        <div class="row"><input type="range" id="ar-cargo-range" min="0" max="3500" step="5" value="300"><span class="num"><input type="number" id="ar-cargo-num" min="0" max="3500" step="any" value="300"><em>t</em></span></div>
+        <div class="btn-grid">
+          <button type="button" class="tb" data-cargo="25">+1 contenedor</button>
+          <button type="button" class="tb" data-cargo="125">+5 contenedores</button>
+          <button type="button" class="tb" data-cargo="-25">−1 contenedor</button>
+          <button type="button" class="tb" data-cargo="500">+ Bobinas de acero (500 t)</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label>Agua en la que flota <i>ρ</i></label>
+        <div class="chips" data-target="ar-rho">
+          <button type="button" data-v="1000">Agua dulce (río)</button>
+          <button type="button" data-v="1025">Agua de mar</button>
+          <button type="button" data-v="1240">Mar Muerto</button>
+        </div>
+        <div class="row"><input type="range" id="ar-rho-range" min="950" max="1300" step="1" value="1025"><span class="num"><input type="number" id="ar-rho-num" min="950" max="1300" step="any" value="1025"><em>kg/m³</em></span></div>
+      </div>
+      <div class="ctl">
+        <label>Gravedad <i>g</i></label>
+        <div class="chips" data-target="ar-g">
+          <button type="button" data-v="9.81">Tierra</button>
+          <button type="button" data-v="1.62">Luna</button>
+          <button type="button" data-v="3.71">Marte</button>
+        </div>
+        <div class="row hidden-row"><input type="range" id="ar-g-range" min="1" max="25" step="0.01" value="9.81"><span class="num"><input type="number" id="ar-g-num" min="1" max="25" step="any" value="9.81"><em>m/s²</em></span></div>
+      </div>
+      <label class="sw"><input type="checkbox" id="ar-press" checked><span></span>Ver presiones del agua sobre el casco</label>
+      <label class="sw"><input type="checkbox" id="ar-ghost"><span></span>Ver el agua desplazada como un cubo</label>
+      <div class="transport">
+        <button type="button" class="tb" id="ar-waves">⏸ Pausar olas</button>
+        <button type="button" class="tb" id="ar-reset">↺ Reiniciar (vaciar)</button>
+      </div>
+    </div>
+    <div class="ar-tank" hidden>
+      <div class="ctl">
+        <label>Material del bloque</label>
+        <div class="chips mats" data-target="ar-mrho">
+          <button type="button" data-v="240">Corcho</button>
+          <button type="button" data-v="500">Madera</button>
+          <button type="button" data-v="917">Hielo</button>
+          <button type="button" data-v="1380">PVC</button>
+          <button type="button" data-v="2700">Aluminio</button>
+          <button type="button" data-v="7870">Hierro</button>
+        </div>
+        <div class="row"><input type="range" id="ar-mrho-range" min="50" max="20000" step="10" value="500"><span class="num"><input type="number" id="ar-mrho-num" min="50" max="20000" step="any" value="500"><em>kg/m³</em></span></div>
+      </div>
+      <div class="ctl">
+        <label>Líquido del tanque</label>
+        <div class="chips" data-target="ar-trho">
+          <button type="button" data-v="920">Aceite</button>
+          <button type="button" data-v="1000">Agua</button>
+          <button type="button" data-v="1260">Glicerina</button>
+          <button type="button" data-v="13534">Mercurio</button>
+        </div>
+        <div class="row hidden-row"><input type="range" id="ar-trho-range" min="700" max="14000" step="1" value="1000"><span class="num"><input type="number" id="ar-trho-num" min="700" max="14000" step="any" value="1000"><em>kg/m³</em></span></div>
+      </div>
+      <div class="ctl">
+        <label for="ar-vol-num">Volumen del bloque</label>
+        <div class="row"><input type="range" id="ar-vol-range" min="1" max="100" step="1" value="27"><span class="num"><input type="number" id="ar-vol-num" min="1" max="100" step="any" value="27"><em>L</em></span></div>
+      </div>
+      <button type="button" class="tb play wide" id="ar-drop">↓ Soltar el bloque</button>
+      <p class="tip">También podés <b>arrastrar el bloque</b> y soltarlo dentro del agua.</p>
+    </div>
+    <button type="button" class="video-btn" id="video-open">
+      <span class="vb-thumb" aria-hidden="true"><img src="assets/video/arquimedes-portada.jpg" alt="" loading="lazy" onerror="this.remove()"><span class="vb-play">▶</span></span>
+      <span><b>ARQUÍMEDES EN ACCIÓN</b><small>Descubrí por qué algunos objetos flotan y otros se hunden mediante una demostración experimental.</small></span>
+    </button>
+  </div>
+
+  <!-- ---------- DESAFÍO ---------- -->
+  <div class="mod-ui" data-mod="desafio">
+    <h3 class="hud-title"><span>★</span> Desafío final</h3>
+    <div class="seg" role="tablist">
+      <button type="button" class="on" data-detab="missions">🛠 Misiones</button>
+      <button type="button" data-detab="quiz">🎯 Cuestionario</button>
+      <button type="button" data-detab="problems">🧮 Problemas</button>
+    </div>
+    <div class="de-score">
+      <div><small>Puntaje</small><b id="de-points">0</b></div>
+      <div><small>Misiones</small><b id="de-done">0/6</b></div>
+    </div>
+    <ol class="mission-list" id="mission-list"></ol>
+    <button type="button" class="tb wide" id="de-restart">↺ Nuevas misiones (datos nuevos)</button>
+  </div>
+</aside>
+
+<!-- ================= PANEL DERECHO: DATOS ================= -->
+<aside class="hud hud-right" id="hud-right" aria-label="Datos en tiempo real">
+  <div class="hud-tabs">
+    <button type="button" class="ht" data-sheet="left">Controles</button>
+    <button type="button" class="ht on" data-sheet="right">Datos</button>
+  </div>
+
+  <!-- PRESIÓN -->
+  <div class="mod-ui" data-mod="presion">
+    <div class="leds">
+      <div class="led"><small>Profundidad h</small><b id="pr-o-h">—</b></div>
+      <div class="led big"><small id="pr-o-P-lbl">Presión del líquido</small><b id="pr-o-P">—</b><span id="pr-o-Pk">—</span></div>
+      <div class="led"><small id="pr-o-abs-lbl">Presión absoluta</small><b id="pr-o-abs">—</b></div>
+      <div class="led"><small>En atmósferas</small><b id="pr-o-atm">—</b></div>
+    </div>
+    <div class="fcard">
+      <div class="f-main">P = <span class="v" data-v="rho">ρ</span> · <span class="v" data-v="g">g</span> · <span class="v" data-v="h">h</span></div>
+      <div class="f-sub" id="pr-f-sub">—</div>
+      <ul class="f-legend">
+        <li data-v="rho"><b>ρ</b> densidad del líquido: <span id="pr-l-rho">—</span></li>
+        <li data-v="g"><b>g</b> gravedad: <span id="pr-l-g">—</span></li>
+        <li data-v="h"><b>h</b> profundidad del buzo: <span id="pr-l-h">—</span></li>
+      </ul>
+    </div>
+    <div class="chart"><small>Presión según la profundidad <span id="pr-trace-lbl"></span></small><svg id="pr-chart" viewBox="0 0 300 130"></svg></div>
+    <div class="whatif" data-sim="presion">
+      <small>¿Qué sucede si…?</small>
+      <button type="button" data-wi="double">…bajo al doble de profundidad?</button>
+      <button type="button" data-wi="wide">…el tanque es mucho más ancho?</button>
+      <button type="button" data-wi="moon">…el tanque está en la Luna?</button>
+      <button type="button" data-wi="oil">…cambio el agua por aceite?</button>
+    </div>
+  </div>
+
+  <!-- TEOREMA -->
+  <div class="mod-ui" data-mod="teorema">
+    <div class="leds">
+      <div class="led s1"><small>Sensor 1 · P₁</small><b id="te-o-P1">—</b></div>
+      <div class="led s2"><small>Sensor 2 · P₂</small><b id="te-o-P2">—</b></div>
+      <div class="led"><small>Diferencia de altura h₁ − h₂</small><b id="te-o-dh">—</b></div>
+      <div class="led"><small>Diferencia de presión P₂ − P₁</small><b id="te-o-dP">—</b></div>
+    </div>
+    <div class="fcard">
+      <div class="f-main">P₂ − P₁ = <span class="v" data-v="rho">ρ</span> · <span class="v" data-v="g">g</span> · (<span class="v" data-v="h1">h₁</span> − <span class="v" data-v="h2">h₂</span>)</div>
+      <div class="f-sub" id="te-f-sub">—</div>
+    </div>
+    <div class="verdict" id="te-verdict"></div>
+    <div class="guide" id="te-guide-box" hidden>
+      <small>Comprobá el teorema vos mismo</small>
+      <ol id="te-steps">
+        <li data-step="0">Poné los dos sensores <b>a la misma altura</b> (en distintos lugares).</li>
+        <li data-step="1">Bajá el sensor 2 hasta que esté <b>3 m más abajo</b> que el sensor 1.</li>
+        <li data-step="2">Con esa misma diferencia, cambiá el líquido a <b>mercurio</b>.</li>
+      </ol>
+    </div>
+    <div class="whatif" data-sim="teorema">
+      <small>¿Qué sucede si…?</small>
+      <button type="button" data-wi="same">…pongo los dos sensores a la misma altura?</button>
+      <button type="button" data-wi="side">…solo muevo un sensor hacia el costado?</button>
+      <button type="button" data-wi="mercury">…el líquido fuera mercurio?</button>
+      <button type="button" data-wi="swap">…el sensor 2 queda arriba del 1?</button>
+    </div>
+  </div>
+
+  <!-- PRENSA -->
+  <div class="mod-ui" data-mod="prensa">
+    <div class="leds">
+      <div class="led big ok" id="ph-o-F2-box"><small>Fuerza de salida F₂</small><b id="ph-o-F2">—</b><span id="ph-o-state">—</span></div>
+      <div class="led"><small>Presión que genera F₁ (F₁/A₁)</small><b id="ph-o-P">—</b></div>
+      <div class="led"><small>Presión que necesita la carga (peso/A₂)</small><b id="ph-o-Pn">—</b></div>
+      <div class="led"><small>Peso de la carga</small><b id="ph-o-W">—</b></div>
+      <div class="led"><small>Multiplicación F₂/F₁</small><b id="ph-o-x">—</b></div>
+      <div class="led"><small>Altura elevada</small><b id="ph-o-H">—</b></div>
+    </div>
+    <div class="fcard">
+      <div class="f-main"><span class="v" data-v="F1">F₁</span> / <span class="v" data-v="A1">A₁</span> = <span class="v" data-v="F2">F₂</span> / <span class="v" data-v="A2">A₂</span></div>
+      <div class="f-sub" id="ph-f-sub">—</div>
+    </div>
+    <div class="energy-box">
+      <small>Conservación de la energía</small>
+      <div class="rul"><span>d₁ total</span><div><i id="ph-r1"></i></div><b id="ph-o-d1">—</b></div>
+      <div class="rul"><span>H</span><div><i id="ph-r2"></i></div><b id="ph-o-d2">—</b></div>
+      <p id="ph-energy">—</p>
+    </div>
+    <div class="example" id="ph-example-box" hidden>
+      <b>🧪 Experimento de ejemplo</b>
+      <p>F₁ = 100 N · A₁ = 5 cm² · A₂ = 50 cm² → <strong>F₂ = 1000 N</strong>. La fuerza de salida es diez veces mayor que la fuerza inicial.</p>
+      <p>Al aplicar una fuerza de 100 N sobre el émbolo pequeño, se genera una presión que se transmite al fluido. Como el segundo émbolo posee una superficie diez veces mayor, la fuerza resultante también será diez veces mayor, en condiciones ideales. Con 1000 N alcanza para levantar la caja de 80 kg (785 N), pero no un auto.</p>
+    </div>
+    <div class="whatif" data-sim="prensa">
+      <small>¿Qué sucede si…?</small>
+      <button type="button" data-wi="car">…quiero levantar el auto con la menor fuerza?</button>
+      <button type="button" data-wi="doubleA2">…duplico el área del pistón grande?</button>
+      <button type="button" data-wi="smallA2">…el pistón de salida es más chico que el de entrada?</button>
+      <button type="button" data-wi="energy">…la prensa «crea» energía?</button>
+    </div>
+  </div>
+
+  <!-- ARQUÍMEDES -->
+  <div class="mod-ui" data-mod="arquimedes">
+    <div class="ar-port">
+      <div class="leds">
+        <div class="led big" id="ar-o-state-box"><small>Estado del barco</small><b id="ar-o-state">—</b><span id="ar-o-state2">—</span></div>
+        <div class="led"><small>Masa total (barco 900 t + carga)</small><b id="ar-o-m">—</b></div>
+        <div class="led"><small>Peso P = m·g</small><b id="ar-o-W">—</b></div>
+        <div class="led ok"><small>Empuje E = ρ·g·V</small><b id="ar-o-E">—</b></div>
+        <div class="led"><small>Volumen desplazado V</small><b id="ar-o-V">—</b></div>
+        <div class="led"><small>Calado (parte sumergida)</small><b id="ar-o-d">—</b></div>
+        <div class="led"><small>Francobordo (lo que queda afuera)</small><b id="ar-o-f">—</b></div>
+      </div>
+      <div class="meter">
+        <small>Peso comparado con el empuje máximo posible</small>
+        <div class="meter-bar"><i id="ar-meter"></i><span id="ar-meter-mark"></span></div>
+        <p id="ar-meter-txt">—</p>
+      </div>
+      <div class="fcard">
+        <div class="f-main">E = <span class="v" data-v="rho">ρ</span> · <span class="v" data-v="g">g</span> · <span class="v" data-v="V">V</span></div>
+        <div class="f-sub" id="ar-f-sub">—</div>
+      </div>
+      <div class="whatif" data-sim="arquimedes">
+        <small>¿Qué sucede si…?</small>
+        <button type="button" data-wi="river">…el barco entra a un río (agua dulce)?</button>
+        <button type="button" data-wi="moon">…hacemos el experimento en la Luna?</button>
+        <button type="button" data-wi="max">…le cargo lo máximo posible?</button>
+        <button type="button" data-wi="steel">…el barco es de acero: ¿cómo flota?</button>
+      </div>
+    </div>
+    <div class="ar-tank" hidden>
+      <div class="leds">
+        <div class="led big" id="ar-t-state-box"><small>Estado del bloque</small><b id="ar-t-state">—</b><span id="ar-t-frac">—</span></div>
+        <div class="led"><small>Peso P</small><b id="ar-t-W">—</b></div>
+        <div class="led ok"><small>Empuje E</small><b id="ar-t-E">—</b></div>
+        <div class="led"><small>Volumen desplazado</small><b id="ar-t-V">—</b></div>
+      </div>
+      <p class="explain" id="ar-t-explain"></p>
+    </div>
+  </div>
+
+  <!-- DESAFÍO -->
+  <div class="mod-ui" data-mod="desafio">
+    <div class="de-panel" id="de-missions">
+      <div class="mission" id="mission">
+        <span class="m-tag" id="m-tag"></span>
+        <h4 id="m-title"></h4>
+        <p id="m-text"></p>
+        <div class="m-answer" id="m-answer">
+          <span class="num wide"><input type="text" inputmode="decimal" autocomplete="off" id="m-input" placeholder="Tu respuesta"><em id="m-unit"></em></span>
+          <div class="m-choices" id="m-choices" hidden></div>
+        </div>
+        <div class="m-actions">
+          <button type="button" class="tb play" id="m-check">Verificar</button>
+          <button type="button" class="tb" id="m-hint">Pista</button>
+          <button type="button" class="tb" id="m-solve">Ver solución</button>
+          <button type="button" class="tb" id="m-next">Siguiente →</button>
+        </div>
+        <div class="m-fb" id="m-fb" aria-live="polite"></div>
+      </div>
+    </div>
+    <div class="de-panel" id="de-quiz" hidden>
+      <div class="quiz">
+        <div class="q-top"><div class="q-dots" id="q-dots"></div><span id="q-score">0 pts</span></div>
+        <div id="q-body"></div>
+        <button type="button" class="tb play" id="q-next" disabled>Siguiente →</button>
+      </div>
+    </div>
+    <div class="de-panel" id="de-problems" hidden>
+      <div class="problem">
+        <span class="m-tag" id="pb-type"></span>
+        <p id="pb-statement"></p>
+        <label for="pb-answer" id="pb-ask"></label>
+        <span class="num wide"><input type="text" inputmode="decimal" autocomplete="off" id="pb-answer" placeholder="Tu respuesta"><em id="pb-unit"></em></span>
+        <div class="m-actions">
+          <button type="button" class="tb play" id="pb-check">Verificar</button>
+          <button type="button" class="tb" id="pb-solution">Ver solución</button>
+          <button type="button" class="tb" id="pb-new">Nuevo problema</button>
+        </div>
+        <div class="m-fb" id="pb-feedback" aria-live="polite"></div>
+        <p class="tip">Resueltos: <b id="pb-score">0</b> · se acepta un error de hasta 1 %.</p>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ================= DIÁLOGO DE PERSONAJES ================= -->
+<div class="dialog" id="dialog" hidden>
+  <div class="dlg-avatar" id="dlg-avatar" aria-hidden="true"></div>
+  <div class="dlg-body">
+    <div class="dlg-head"><b id="dlg-name"></b><small id="dlg-role"></small></div>
+    <p id="dlg-text"></p>
+  </div>
+  <div class="dlg-actions">
+    <button type="button" class="dlg-btn" id="dlg-next" title="Siguiente consejo">›</button>
+    <button type="button" class="dlg-btn" id="dlg-min" title="Minimizar">–</button>
+  </div>
+</div>
+
+<!-- ================= TEORÍA (CAJÓN LATERAL) ================= -->
+<aside class="drawer" id="drawer" aria-label="Teoría" hidden>
+  <div class="drawer-head">
+    <b id="drawer-title">Teoría</b>
+    <button type="button" class="icon-btn" id="drawer-close" aria-label="Cerrar teoría">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div class="theory" data-mod="lobby">
+      <h2>¿Qué es la hidrostática?</h2>
+      <p class="t-brief">Es la parte de la física que estudia los líquidos <b>quietos</b> (en reposo) y las fuerzas que hacen sobre los objetos y las paredes que tocan. En este laboratorio vas a experimentar con sus cuatro ideas principales: la presión en los líquidos, el teorema general de la hidrostática, el principio de Pascal y el principio de Arquímedes.</p>
+      <p class="t-brief">Elegí una estación para empezar. En cada una vas a poder mover objetos, cambiar variables y ver los resultados calculados al instante.</p>
+    </div>
+    <div class="theory" data-mod="presion">
+      <h2>¿Qué le pasa a la presión cuando <em>bajás</em> en el agua?</h2>
+      <p class="t-brief">Cuando nos sumergimos en una pileta, sentimos que el agua nos aprieta más cuanto más profundo estamos. Esto pasa porque, a mayor profundidad, hay <strong>más agua por encima nuestro</strong>, y esa agua pesa. Por eso la presión aumenta.</p>
+      <div class="t-formula"><div class="formula">P = ρ · g · h</div><ul class="vars"><li><b>P</b> la presión que hace el líquido, en pascales (Pa)</li>
+          <li><b>ρ</b> (se lee «ro») la densidad: cuántos kilos pesa un metro cúbico de ese líquido. Agua: 1000 kg/m³</li>
+          <li><b>g</b> la gravedad, la fuerza con que la Tierra atrae las cosas: 9,81 m/s²</li>
+          <li><b>h</b> la profundidad: cuántos metros por debajo de la superficie estás</li></ul><p class="note">Ejemplo: a 3 m de profundidad en agua, P = 1000 · 9,81 · 3 = 29 430 Pa. Ojo: encima del agua también está el aire, que empuja la superficie. Si queremos la presión <b>total</b> (o absoluta), le sumamos la del aire: <b>P<sub>absoluta</sub> = P<sub>atm</sub> + ρ·g·h</b>. En la superficie (h = 0) el agua no aporta nada y solo queda la del aire, unos 101 325 Pa.</p></div>
+      
+      <div class="t-grid"><div class="t-card"><h4>¿Qué es la presión?</h4><p>La presión indica <b>cuánta fuerza se apoya sobre cada pedacito de superficie</b>: P = F/A. No es lo mismo que la fuerza. Si pisás la arena con zapatillas no te hundís, pero con tacos finitos sí: tu peso es el mismo, pero con los tacos se concentra en un área chiquita y la presión es mucho mayor. Se mide en <b>pascal (Pa)</b>: 1 Pa es 1 newton repartido en 1 metro cuadrado.</p></div><div class="t-card"><h4>La presión en un líquido quieto</h4><p>Un líquido que no se mueve empuja <b>para todos lados</b>: hacia abajo, hacia los costados y también hacia arriba. Por eso, bajo el agua, sentís la presión en todo el cuerpo y no solo en la cabeza. A esta presión de un líquido en reposo la llamamos <b>presión estática</b>.</p></div><div class="t-card"><h4>¿Por qué aumenta con la profundidad?</h4><p>Imaginá una columna de agua parada sobre tu cabeza. Si bajás más, la columna es más alta y pesa más. Ese peso extra es el aumento de presión. Un detalle curioso: <b>no importa si la pileta es chica o enorme</b>. A 2 m de profundidad, la presión es la misma en un balde gigante que en el mar, porque solo cuenta cuánta agua hay justo encima.</p></div><div class="t-card"><h4>¿De qué depende?</h4><p>De tres cosas: <b>la profundidad</b> (más abajo, más presión), <b>el tipo de líquido</b> (uno más «pesado», como el agua de mar, presiona más que uno más liviano, como el aceite) y <b>la gravedad</b> (en la Luna, el mismo líquido presionaría seis veces menos). Para tener una idea de los números: 1 kPa = 1000 Pa, y el aire que nos rodea ejerce unos 101 325 Pa, que es 1 atmósfera.</p></div></div>
+      <div class="t-concl"><b>Conclusión</b><p>Cuanto más profundo, más líquido hay encima y más presión. Si el líquido y la gravedad no cambian, la presión crece en forma pareja: al doble de profundidad, el doble de presión.</p></div>
+    </div>
+    <div class="theory" data-mod="teorema">
+      <h2>Dos puntos del mismo líquido: <em>¿cuál soporta más presión?</em></h2>
+      <p class="t-brief">Pensá en una botella llena de agua: si le hacés un agujerito cerca del fondo, el chorro sale con más fuerza que si lo hacés arriba. En un líquido quieto, <strong>el punto que está más abajo siempre tiene más presión</strong>. Si dos puntos están a la misma altura, tienen la misma presión, aunque estén lejos uno del otro.</p>
+      <div class="t-formula"><div class="formula">P₂ − P₁ = ρ · g · (h₁ − h₂)</div><ul class="vars"><li><b>P₁ y P₂</b> la presión en el punto 1 y en el punto 2 (Pa)</li>
+          <li><b>ρ</b> la densidad del líquido: cuánto pesa cada metro cúbico (kg/m³)</li>
+          <li><b>g</b> la gravedad: 9,81 m/s²</li>
+          <li><b>h₁ y h₂</b> la altura de cada punto, medida desde el fondo del recipiente (m). Las dos se miden desde el mismo lugar</li></ul><p class="note">Cómo leerla: (h₁ − h₂) es cuántos metros más abajo está el punto 2. Si el punto 2 está más abajo, el resultado da positivo y P₂ es mayor que P₁. Si está más arriba, da negativo y P₂ es menor. Si están a la misma altura, da cero: misma presión.</p></div>
+      
+      <div class="t-grid"><div class="t-card"><h4>¿Qué dice el teorema?</h4><p>Que para saber cuánta más presión tiene un punto que otro, <b>solo hace falta saber cuántos metros más abajo está</b>. Esa diferencia de presión es el peso de la «capa» de líquido que hay entre los dos puntos.</p></div><div class="t-card"><h4>Misma altura, misma presión</h4><p>Dos puntos a la misma altura tienen exactamente la misma cantidad de agua encima, así que soportan la misma presión. Si no fuera así, el agua se movería del lado con más presión al de menos, y no estaría quieta. Por eso, en una manguera con agua en forma de U, el agua queda <b>al mismo nivel</b> en los dos extremos.</p></div><div class="t-card"><h4>¿Y si un punto está más abajo?</h4><p>Tiene más presión. Ejemplo con una pileta: si un punto está a 1 m de profundidad y otro a 3 m, el segundo tiene 2 m más de agua encima. Su presión es mayor en 1000 · 9,81 · 2 = <b>19 620 Pa</b>. Es la misma idea del módulo 1, pero comparando dos puntos entre sí en lugar de medir desde la superficie.</p></div><div class="t-card"><h4>¿Dónde lo vemos?</h4><p>Las <b>represas</b> son más gruesas abajo porque ahí el agua empuja más. Los <b>tanques de agua</b> se ponen en lo alto de las casas para que el agua llegue con fuerza a las canillas. Y en el hospital, la bolsa de <b>suero</b> se cuelga alta para que el líquido entre al cuerpo.</p></div></div>
+      <div class="t-concl"><b>Conclusión</b><p>En un líquido quieto, cuanto más abajo está un punto, más presión tiene. Dos puntos a la misma altura tienen siempre la misma presión, sin importar dónde estén.</p></div>
+    </div>
+    <div class="theory" data-mod="prensa">
+      <h2>¿Cómo se levanta un auto con <em>la fuerza de una mano</em>?</h2>
+      <p class="t-brief">La prensa hidráulica funciona porque la presión que se aplica a un líquido encerrado <strong>se transmite por todo el líquido</strong>. Así, haciendo fuerza sobre un pistón pequeño, podemos levantar un objeto muy pesado que está sobre un pistón más grande.</p>
+      <div class="t-formula"><div class="formula">F₁ / A₁ = F₂ / A₂ <span class="f-arrow">⇒</span> F₂ = (F₁ · A₂) / A₁</div><ul class="vars"><li><b>F₁</b> la fuerza que hacemos sobre el pistón chico, en newtons (N)</li>
+          <li><b>A₁</b> la superficie del pistón chico</li>
+          <li><b>F₂</b> la fuerza que obtenemos en el pistón grande (N)</li>
+          <li><b>A₂</b> la superficie del pistón grande</li></ul><p class="note">La fórmula dice que <b>la presión es igual en los dos pistones</b> (F/A de un lado = F/A del otro).<br><br><b>Ejemplo paso a paso:</b> hacemos 100 N sobre un pistón de 5 cm², y el pistón grande mide 50 cm².<br>1. Planteamos: 100 / 5 = F₂ / 50<br>2. El lado izquierdo da 20 (son 20 N por cada cm²).<br>3. Entonces F₂ = 20 · 50 = <b>1000 N</b>.<br>4. Conclusión: con 100 N obtenemos 1000 N, porque el pistón grande es 10 veces más grande.<br><br>Mientras A₁ y A₂ estén en la misma unidad (los dos en cm², por ejemplo), la cuenta da bien. Para calcular la presión en pascales sí hay que pasar a m²: 1 cm² = 0,0001 m².</p></div>
+      <blockquote class="quote">Si apretás un líquido encerrado en un recipiente, esa presión extra llega completa a todos los puntos del líquido y a todas las paredes.<cite>Principio de Pascal, explicado en palabras simples</cite></blockquote>
+      <div class="t-grid"><div class="t-card"><h4>¿Qué es una prensa hidráulica?</h4><p>Son dos cilindros, uno <b>finito</b> y otro <b>ancho</b>, unidos por un tubo y llenos de aceite. Cada cilindro tiene arriba un pistón (también llamado <b>émbolo</b>), que es como una tapa que puede subir y bajar. El aceite casi no se puede comprimir: si lo empujás de un lado, tiene que salir por el otro.</p></div><div class="t-card"><h4>¿Cómo funciona?</h4><p>1. Empujás el pistón chico con una fuerza pequeña.<br>2. Como su superficie es chica, esa fuerza genera mucha presión en el aceite.<br>3. El aceite lleva esa <b>misma presión</b> hasta el pistón grande.<br>4. El pistón grande tiene mucha más superficie, y cada centímetro cuadrado recibe la misma presión. Por eso, en total, la fuerza hacia arriba es <b>mucho mayor</b>.</p></div><div class="t-card"><h4>¿Por qué una fuerza chica se vuelve grande?</h4><p>Pensalo así: la presión es «fuerza por cada centímetro cuadrado». Si el pistón grande tiene <b>10 veces más superficie</b> que el chico, recibe esa presión en 10 veces más centímetros cuadrados. Entonces la fuerza total que sale es <b>10 veces mayor</b>. No hay magia: es la misma presión repartida sobre más área.</p></div><div class="t-card"><h4>¿Para qué se usa?</h4><p>En los <b>elevadores de autos</b> de los talleres, en los <b>frenos</b> de autos y motos (pisás un pedal liviano y las ruedas frenan con mucha fuerza), en los <b>gatos hidráulicos</b> para cambiar una rueda y en <b>máquinas</b> como retroexcavadoras y grúas. En el simulador suponemos un caso ideal, sin rozamiento ni pérdidas.</p></div><div class="t-card wide"><h4>Conservación de la energía</h4><p>La prensa no regala nada: <b>ganás fuerza, pero perdés recorrido</b>. El aceite que empujás desde el pistón chico tiene que repartirse debajo del pistón grande, que es mucho más ancho, así que este sube muy poquito (<b>A₁·d₁ = A₂·d₂</b>). Por eso un gato hidráulico necesita muchos bombeos para levantar el auto unos centímetros. La energía que ponés es la misma que obtenés: <b>F₁·d₁ = F₂·d₂</b>.</p></div></div>
+      <div class="t-concl"><b>Conclusión</b><p>La prensa hidráulica multiplica la fuerza porque la presión llega igual a los dos pistones, y el grande tiene más superficie. A cambio, el pistón grande se mueve menos: la fuerza aumenta, pero la energía no.</p></div>
+    </div>
+    <div class="theory" data-mod="arquimedes">
+      <h2>¿Por qué algunos objetos <em>flotan</em> y otros se hunden?</h2>
+      <p class="t-brief">Cuando metés una pelota en la pileta, sentís que el agua la empuja hacia arriba. Esa fuerza se llama <strong>empuje</strong>. Si el empuje es más fuerte que el peso del objeto, el objeto sube y flota. Si el peso gana, el objeto se hunde.</p>
+      <div class="t-formula"><div class="formula">E = ρ<sub>fluido</sub> · g · V<sub>sumergido</sub></div><ul class="vars"><li><b>E</b> el empuje: la fuerza hacia arriba que hace el líquido, en newtons (N)</li>
+          <li><b>ρ<sub>fluido</sub></b> la densidad del <b>líquido</b> (no la del objeto), en kg/m³</li>
+          <li><b>g</b> la gravedad: 9,81 m/s²</li>
+          <li><b>V<sub>sumergido</sub></b> la parte del objeto que está bajo el líquido (m³). Es igual al volumen de líquido que el objeto corrió de lugar</li></ul><p class="note">Para comparar, el peso del objeto es P = ρ<sub>objeto</sub>·g·V.<br>Ejemplo: un bloque de 10 litros (0,01 m³) totalmente bajo el agua recibe E = 1000 · 9,81 · 0,01 = <b>98,1 N</b>. Si el bloque es de madera, pesa unos 49 N: el empuje gana y flota. Si es de hierro, pesa unos 772 N: el peso gana y se hunde.</p></div>
+      <blockquote class="quote">Todo objeto que metemos en un líquido recibe un empuje hacia arriba. Ese empuje es igual al peso del líquido que el objeto corrió de lugar.<cite>Principio de Arquímedes, explicado en palabras simples</cite></blockquote>
+      <div class="t-grid"><div class="t-card"><h4>¿Qué es el empuje?</h4><p>Es la fuerza hacia arriba que hace el líquido sobre cualquier objeto sumergido. Aparece porque <b>la parte de abajo del objeto está más profunda</b> que la de arriba, y ya vimos que más abajo hay más presión. El agua empuja más fuerte desde abajo que desde arriba, y la diferencia es el empuje.</p></div><div class="t-card"><h4>¿Por qué unos flotan y otros se hunden?</h4><p>Sobre el objeto hay dos fuerzas peleando: su <b>peso</b>, hacia abajo, y el <b>empuje</b>, hacia arriba. Lo que decide quién gana es la <b>densidad</b>, es decir, qué tan «pesado» es el material para su tamaño. Si el objeto es menos denso que el líquido (madera en agua), flota. Si es más denso (una piedra), se hunde. Si son iguales, queda suspendido.</p></div><div class="t-card"><h4>¿Cuánto se hunde algo que flota?</h4><p>Se hunde justo lo necesario para que el empuje iguale a su peso, y ahí se queda quieto. Un objeto que es casi tan denso como el agua flota muy hundido. Por ejemplo, el hielo queda alrededor del 90 % bajo el agua: de ahí la frase «es solo la punta del iceberg».</p></div><div class="t-card"><h4>¿Por qué las cosas «pesan menos» en el agua?</h4><p>Porque el empuje ayuda a sostenerlas. Por eso podés levantar a un amigo dentro de la pileta con mucho menos esfuerzo. Aunque un objeto se hunda, el agua igual lo empuja: lo que notamos es su peso menos el empuje. A eso se le llama <b>peso aparente</b>.</p></div></div>
+      <div class="t-concl"><b>Conclusión</b><p>Todo líquido empuja hacia arriba lo que se sumerge en él. Si el empuje puede igualar al peso, el objeto flota. Si no, se hunde. En la práctica, flota lo que es menos denso que el líquido.</p></div>
+    </div>
+    <div class="theory" data-mod="desafio">
+      <h2>Desafío final</h2>
+      <p class="t-brief">Seis misiones de ingeniería con datos nuevos cada vez: encontrar la profundidad de un buzo, descubrir qué sensor mide más presión, calcular la fuerza para levantar un auto y la carga máxima de un barco, entre otras.</p>
+      <p class="t-brief">Cada misión vale <b>100 puntos</b> si acertás al primer intento y <b>50</b> si acertás después. Si mirás la solución, la misión no suma puntos. También tenés el cuestionario de 10 preguntas y problemas numéricos aleatorios.</p>
+    </div>
+  </div>
+</aside>
+
+<!-- ================= AYUDA DE CÁMARA ================= -->
+<div class="help" id="help" hidden>
+  <div class="help-box">
+    <h3>Cómo moverte en el laboratorio</h3>
+    <ul>
+      <li><b>Girar:</b> arrastrá con el mouse (o con un dedo) sobre un lugar vacío.</li>
+      <li><b>Acercar y alejar:</b> rueda del mouse (o pellizco con dos dedos).</li>
+      <li><b>Desplazar:</b> botón derecho del mouse, Shift + arrastrar, o dos dedos.</li>
+      <li><b>Interactuar:</b> arrastrá los objetos que se iluminan al pasar el mouse: el buzo, los sensores, la palanca de la bomba y el bloque.</li>
+      <li><b>Personajes:</b> hacé clic en un personaje para escuchar su siguiente consejo.</li>
+      <li><b>⟲ Vista</b> vuelve la cámara a su lugar.</li>
+    </ul>
+    <button type="button" class="btn btn-primary" id="help-close">Entendido</button>
+  </div>
+</div>
+
+<!-- ================= MODAL DE VIDEO ================= -->
+<div class="modal" id="video-modal" role="dialog" aria-modal="true" aria-labelledby="video-title" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-box">
+    <button type="button" class="modal-close" data-close aria-label="Cerrar">✕</button>
+    <h3 id="video-title">ARQUÍMEDES EN ACCIÓN</h3>
+    <div class="video-frame" id="video-frame"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" aria-live="polite"></div>
+
+<script src="js/engine.js?v=3.1.0"></script>
+<script src="js/models.js?v=3.1.0"></script>
+<script src="script.js?v=3.1.0"></script>
+<script src="js/mod-lobby.js?v=3.1.0"></script>
+<script src="js/mod-presion.js?v=3.1.0"></script>
+<script src="js/mod-teorema.js?v=3.1.0"></script>
+<script src="js/mod-prensa.js?v=3.1.0"></script>
+<script src="js/mod-arquimedes.js?v=3.1.0"></script>
+<script src="js/mod-desafio.js?v=3.1.0"></script>
+<script>HYDROLAB.start();</script>
+</body>
+</html>

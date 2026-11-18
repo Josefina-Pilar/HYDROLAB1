@@ -1,0 +1,40 @@
+# Blueprint de Render para HYDROLAB (sitio estático: no necesita servidor ni compilación)
+services:
+  - type: web
+    name: hydrolab
+    runtime: static
+    # No hay que compilar nada: el comando solo verifica que estén todos los archivos.
+    buildCommand: bash scripts/verificar.sh
+    staticPublishPath: ./public
+    headers:
+      # Seguridad básica
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      # La página principal siempre se revalida, así los cambios se ven al instante
+      - path: /index.html
+        name: Cache-Control
+        value: no-cache
+      - path: /
+        name: Cache-Control
+        value: no-cache
+      # Código (se actualiza con el número de versión ?v= en index.html)
+      - path: /js/*
+        name: Cache-Control
+        value: public, max-age=604800
+      - path: /*.js
+        name: Cache-Control
+        value: public, max-age=604800
+      - path: /*.css
+        name: Cache-Control
+        value: public, max-age=604800
+      # Fuentes e íconos: no cambian
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=2592000
